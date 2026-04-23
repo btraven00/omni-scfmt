@@ -28,17 +28,19 @@ source(file.path(Sys.getenv("SCFMT_ROOT", "/workspace"), "scripts", "stage.R"))
 
 stage("load", {
   obj <- readRDS(args$rds_seurat)
+  if ("X" %in% Layers(obj) && !"counts" %in% Layers(obj))
+    obj <- CreateSeuratObject(counts = LayerData(obj, layer = "X"), meta.data = obj@meta.data)
 })
 
 stage("access", {
   set.seed(args$seed)
   idx <- sample.int(ncol(obj), min(args$access_n, ncol(obj)))
-  sub <- subset(obj, cells = colnames(obj)[idx])
-  access_sum <- sum(Matrix::colSums(GetAssayData(sub, slot = "counts")))
-  rm(sub); invisible(gc(full = TRUE, verbose = FALSE))
+  counts_mat <- LayerData(obj, layer = "counts")
+  access_sum <- sum(Matrix::colSums(counts_mat[, idx, drop = FALSE]))
+  rm(counts_mat); invisible(gc(full = TRUE, verbose = FALSE))
 })
 
-scratch_out <- file.path(args$output_dir, paste0(args$name, ".scratch.rds"))
+scratch_out <- file.path(args$output_dir, paste0(dataset, ".scratch.rds"))
 stage("write", {
   saveRDS(obj, scratch_out)
 })

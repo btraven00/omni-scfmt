@@ -28,7 +28,7 @@ stage("load", {
 })
 
 stage("write", {
-  ad <- anndataR::as_AnnData(sce, x_mapping = "counts")
+  ad <- anndataR::as_AnnData(sce, x_mapping = "X")
   anndataR::write_h5ad(ad, out)
 })
 
