@@ -1,0 +1,193 @@
+id: scfmt
+description: >
+  Single-cell data format benchmark. Profiles (a) format-conversion cost
+  with scx + anndataR, and (b) tool-side LOAD/ACCESS/WRITE performance on
+  native vs foreign formats, with an on-disk (backed) vs in-memory axis.
+  Outer denet+podman enforces cgroup caps and captures eBPF syscall view;
+  an inner denet (via modules/*/profile → scripts/with_inner_denet.sh)
+  samples per-process CPU and RSS at higher granularity.
+version: "0.1.0"
+benchmarker: "omni-scfmt"
+api_version: "0.5.0"
+software_backend: denet+podman
+
+software_environments:
+  scfmt:
+    description: "R + Python + scx + anndataR + BPCells + omnibench-logger"
+    docker: "localhost/scfmt:latest"
+
+stages:
+  - id: data
+    modules:
+      - id: pbmc3k
+        name: "PBMC 3k (10x)"
+        software_environment: scfmt
+        resources: {cores: 1, mem_mb: 8000}
+        repository: {url: ., commit: main, entrypoint: data_pbmc3k}
+
+      - id: pbmc68k
+        name: "PBMC 68k (10x)"
+        software_environment: scfmt
+        resources: {cores: 1, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: data_pbmc68k}
+
+      # Atlas-level brain1m datasets disabled until a shared download cache
+      # is in place — without it each module re-downloads the ~16GB 10x
+      # 1.3M mouse-brain HDF5, and running them concurrently saturates the
+      # network link.
+      # - id: brain1m_10k
+      #   name: "Brain 1.3M → 10k subsample"
+      #   software_environment: scfmt
+      #   resources: {cores: 1, mem_mb: 16000}
+      #   parameters: [{n_cells: 10000,  seed: 1}]
+      #   repository: {url: ., commit: main, entrypoint: data_brain1m_10k}
+      #
+      # - id: brain1m_100k
+      #   name: "Brain 1.3M → 100k subsample"
+      #   software_environment: scfmt
+      #   resources: {cores: 1, mem_mb: 32000}
+      #   parameters: [{n_cells: 100000, seed: 1}]
+      #   repository: {url: ., commit: main, entrypoint: data_brain1m_100k}
+      #
+      # - id: brain1m_500k
+      #   name: "Brain 1.3M → 500k subsample"
+      #   software_environment: scfmt
+      #   resources: {cores: 1, mem_mb: 64000}
+      #   parameters: [{n_cells: 500000, seed: 1}]
+      #   repository: {url: ., commit: main, entrypoint: data_brain1m_500k}
+      #
+      # - id: brain1m_1m
+      #   name: "Brain 1.3M (full)"
+      #   software_environment: scfmt
+      #   resources: {cores: 1, mem_mb: 128000}
+      #   parameters: [{n_cells: 1306127, seed: 1}]
+      #   repository: {url: ., commit: main, entrypoint: data_brain1m_1m}
+
+    outputs:
+      - id: h5ad
+        path: "{dataset}.h5ad"
+
+  # Each converter is its own stage so we get exactly one declared output
+  # per module — omnibenchmark currently requires every module in a stage
+  # to emit the full stage-output set, which doesn't fit 1→1 format
+  # converters.
+
+  - id: convert_h5seurat
+    modules:
+      - id: scx_h5ad_to_h5seurat
+        name: "scx: h5ad → h5seurat"
+        software_environment: scfmt
+        resources: {cores: 2, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: scx_h5ad_to_h5seurat}
+    inputs:
+      - h5ad
+    outputs:
+      - id: h5seurat
+        path: "{dataset}.h5seurat"
+
+  - id: convert_rds_sce
+    modules:
+      - id: anndatar_h5ad_to_rds_sce
+        name: "anndataR: h5ad → rds(SCE)"
+        software_environment: scfmt
+        resources: {cores: 2, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: anndatar_h5ad_to_rds_sce}
+    inputs:
+      - h5ad
+    outputs:
+      - id: rds_sce
+        path: "{dataset}.sce.rds"
+
+  - id: convert_rds_seurat
+    modules:
+      - id: anndatar_h5ad_to_rds_seurat
+        name: "anndataR: h5ad → rds(Seurat)"
+        software_environment: scfmt
+        resources: {cores: 2, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: anndatar_h5ad_to_rds_seurat}
+    inputs:
+      - h5ad
+    outputs:
+      - id: rds_seurat
+        path: "{dataset}.seurat.rds"
+
+  - id: roundtrip_scx_h5ad
+    modules:
+      - id: scx_h5seurat_to_h5ad
+        name: "scx: h5seurat → h5ad"
+        software_environment: scfmt
+        resources: {cores: 2, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: scx_h5seurat_to_h5ad}
+    inputs:
+      - h5seurat
+    outputs:
+      - id: h5ad_rt_scx
+        path: "{dataset}.rt_scx.h5ad"
+
+  - id: roundtrip_anndatar_h5ad
+    modules:
+      - id: anndatar_rds_sce_to_h5ad
+        name: "anndataR: rds(SCE) → h5ad"
+        software_environment: scfmt
+        resources: {cores: 2, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: anndatar_rds_sce_to_h5ad}
+    inputs:
+      - rds_sce
+    outputs:
+      - id: h5ad_rt_anndatar
+        path: "{dataset}.rt_anndatar.h5ad"
+
+  - id: method
+    modules:
+      # Seurat variants
+      - id: seurat_inmemory_rds
+        name: "Seurat / in-memory / rds (native)"
+        software_environment: scfmt
+        resources: {cores: 4, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: seurat_inmemory_rds}
+      - id: seurat_inmemory_h5ad
+        name: "Seurat / in-memory / h5ad (foreign)"
+        software_environment: scfmt
+        resources: {cores: 4, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: seurat_inmemory_h5ad}
+      # seurat_backed_bpcells needs --bpcells_dir which has no upstream snakemake stage
+      # - id: seurat_backed_bpcells
+      #   name: "Seurat / backed / BPCells"
+      #   software_environment: scfmt
+      #   resources: {cores: 4, mem_mb: 16000}
+      #   repository: {url: ., commit: main, entrypoint: seurat_backed_bpcells}
+
+      # scanpy variants
+      - id: scanpy_inmemory_h5ad
+        name: "scanpy / in-memory / h5ad (native)"
+        software_environment: scfmt
+        resources: {cores: 4, mem_mb: 32000}
+        repository: {url: ., commit: main, entrypoint: scanpy_inmemory_h5ad}
+      # scanpy_inmemory_h5seurat needs --h5seurat which is only produced by convert_h5seurat,
+      # not available in all pipeline contexts — re-enable when per-module input wiring lands
+      # - id: scanpy_inmemory_h5seurat
+      #   name: "scanpy / in-memory / h5seurat (foreign)"
+      #   software_environment: scfmt
+      #   resources: {cores: 4, mem_mb: 32000}
+      #   repository: {url: ., commit: main, entrypoint: scanpy_inmemory_h5seurat}
+      - id: scanpy_backed_h5ad
+        name: "scanpy / backed / h5ad"
+        software_environment: scfmt
+        resources: {cores: 4, mem_mb: 16000}
+        repository: {url: ., commit: main, entrypoint: scanpy_backed_h5ad}
+
+    # TODO: proper gather / per-module provides-needs semantics (known ob
+    # limitation). Until that lands, the stage-level inputs list is the
+    # superset of what any module may consume; each module script picks the
+    # concrete path it needs from its args. Snakefile wiring will wire
+    # whatever inputs exist on disk.
+    inputs:
+      - h5ad
+      - h5seurat
+      - rds_sce
+      - rds_seurat
+    outputs:
+      - id: method.timing
+        path: "{dataset}.timing.tsv"
+      - id: method.results
+        path: "{dataset}.results.rds"
