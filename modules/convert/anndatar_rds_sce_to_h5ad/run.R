@@ -10,6 +10,7 @@ parser$add_argument("--output_dir", required = TRUE)
 parser$add_argument("--name",       default  = NULL)  # ignored; derived
 args <- parser$parse_args()
 args$name <- paste0(sub("\\.sce\\.rds$", "", basename(args$rds_sce)), ".rt_anndatar")
+Sys.setenv(HDF5_USE_FILE_LOCKING = "FALSE")
 dir.create(args$output_dir, showWarnings = FALSE, recursive = TRUE)
 
 suppressPackageStartupMessages({

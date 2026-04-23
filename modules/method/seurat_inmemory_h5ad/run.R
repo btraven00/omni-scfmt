@@ -15,6 +15,8 @@ parser$add_argument("--n_comp",     type = "integer", default = 50)
 parser$add_argument("--access_n",   type = "integer", default = 10000)
 parser$add_argument("--seed",       type = "integer", default = 1)
 args <- parser$parse_args()
+dataset <- sub("\\.h5ad$", "", basename(args$h5ad))
+Sys.setenv(HDF5_USE_FILE_LOCKING = "FALSE")
 dir.create(args$output_dir, showWarnings = FALSE, recursive = TRUE)
 
 suppressPackageStartupMessages({
@@ -51,10 +53,10 @@ stage("pca", {
   obj <- RunPCA(obj, npcs = args$n_comp, verbose = FALSE)
 })
 
-timing_df <- stage_timings_df(dataset = args$name)
+timing_df <- stage_timings_df(dataset = dataset)
 write.table(timing_df,
-  file = file.path(args$output_dir, paste0(args$name, ".timing.tsv")),
+  file = file.path(args$output_dir, paste0(dataset, ".timing.tsv")),
   sep = "\t", quote = FALSE, row.names = FALSE)
 saveRDS(list(obj = obj, timing = timing_df, access_sum = access_sum),
-  file.path(args$output_dir, paste0(args$name, ".results.rds")))
-message("Done: ", args$name)
+  file.path(args$output_dir, paste0(dataset, ".results.rds")))
+message("Done: ", dataset)

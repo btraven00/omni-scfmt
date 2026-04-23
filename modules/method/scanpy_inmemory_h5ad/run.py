@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -33,6 +34,7 @@ def main() -> None:
     p.add_argument("--access_n", type=int, default=10_000)
     p.add_argument("--seed", type=int, default=1)
     args = p.parse_args()
+    dataset = Path(args.h5ad).stem
 
     out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
     init_logger(str(out))
@@ -61,13 +63,15 @@ def main() -> None:
         sc.pp.scale(adata, max_value=10)
         sc.tl.pca(adata, n_comps=args.n_comp)
 
-    timing_df = stage_timings_df(dataset=args.name)
-    timing_df.to_csv(out / f"{args.name}.timing.tsv", sep="\t", index=False)
+    timing_df = stage_timings_df(dataset=dataset)
+    timing_df.to_csv(out / f"{dataset}.timing.tsv", sep="\t", index=False)
 
     pd.DataFrame({"access_sum": [access_sum]}).to_csv(
-        out / f"{args.name}.access.tsv", sep="\t", index=False
+        out / f"{dataset}.access.tsv", sep="\t", index=False
     )
-    print(f"Done: {args.name}")
+    results_out = str(out / f"{dataset}.results.rds")
+    subprocess.run(["Rscript", "-e", f'saveRDS(NULL, "{results_out}")'], check=True)
+    print(f"Done: {dataset}")
 
 
 if __name__ == "__main__":
