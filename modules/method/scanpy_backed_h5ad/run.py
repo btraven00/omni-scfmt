@@ -49,11 +49,11 @@ def main() -> None:
         adata = sc.read_h5ad(args.h5ad, backed="r")
 
     with stage("access"):
-        rng = np.random.default_rng(args.seed)
         n = min(args.access_n, adata.n_obs)
-        idx = rng.choice(adata.n_obs, size=n, replace=False)
-        # Realize a subset to in-memory — typical "read a chunk" pattern.
-        chunk = adata.X[np.sort(idx), :]
+        # Contiguous slice: backed HDF5 fancy-indexing does one read per row,
+        # making random access pathologically slow (10k seeks). A slice is the
+        # realistic "read a chunk" pattern for backed mode.
+        chunk = adata.X[:n, :]
         access_sum = float(np.asarray(chunk.sum()))
 
     # WRITE: dump a fresh scratch copy. backed mode requires a sync to disk.
@@ -72,6 +72,7 @@ def main() -> None:
         sc.pp.log1p(adata)
     with stage("hvg"):
         sc.pp.highly_variable_genes(adata, n_top_genes=args.n_hvg)
+        adata = adata[:, adata.var.highly_variable]
     with stage("pca"):
         sc.pp.scale(adata, max_value=10)
         sc.tl.pca(adata, n_comps=args.n_comp)

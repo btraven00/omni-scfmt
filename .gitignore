@@ -1,0 +1,6 @@
+out/
+omnibench.logger/
+env/
+scratch/
+*.swp
+/.snakemake

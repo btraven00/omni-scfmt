@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/../../.." && pwd)"
+export SCFMT_ROOT="$ROOT"
+exec "$ROOT/scripts/with_inner_denet.sh" Rscript "$HERE/run.R" "$@"

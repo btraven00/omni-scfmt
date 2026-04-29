@@ -1,0 +1,16 @@
+[workspace]
+name = "omni-scfmt"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = ">=3.12"
+pip = "*"
+git = "*"
+
+[pypi-dependencies]
+omnibenchmark = { git = "https://github.com/omnibenchmark/omnibenchmark.git", branch = "poc/podman-backend" }
+
+[tasks]
+install-omnibenchmark = "pip install --force-reinstall --no-deps git+https://github.com/omnibenchmark/omnibenchmark.git@poc/podman-backend"
+benchmark = "ob run benchmark.yaml --dirty --unpinned"

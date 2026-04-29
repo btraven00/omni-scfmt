@@ -1,0 +1,25 @@
+entrypoints:
+  # ---- data stage ----
+  data_pbmc3k:      modules/data/pbmc3k/profile
+  data_pbmc68k:     modules/data/pbmc68k/profile
+  # Atlas-level datasets disabled until shared download cache is wired up
+  # (each run currently re-downloads the ~16GB 1.3M brain dataset per module).
+  # data_brain1m_10k:  modules/data/brain1m/profile
+  # data_brain1m_100k: modules/data/brain1m/profile
+  # data_brain1m_500k: modules/data/brain1m/profile
+  # data_brain1m_1m:   modules/data/brain1m/profile
+
+  # ---- convert stage ----
+  scx_h5ad_to_h5seurat:         modules/convert/scx_h5ad_to_h5seurat/profile
+  scx_h5seurat_to_h5ad:         modules/convert/scx_h5seurat_to_h5ad/profile
+  anndatar_h5ad_to_rds_sce:     modules/convert/anndatar_h5ad_to_rds_sce/profile
+  anndatar_rds_sce_to_h5ad:     modules/convert/anndatar_rds_sce_to_h5ad/profile
+  anndatar_h5ad_to_rds_seurat:  modules/convert/anndatar_h5ad_to_rds_seurat/profile
+
+  # ---- method stage ----
+  seurat_inmemory_rds:        modules/method/seurat_inmemory_rds/profile
+  seurat_inmemory_h5ad:       modules/method/seurat_inmemory_h5ad/profile
+  seurat_backed_bpcells:      modules/method/seurat_backed_bpcells/profile
+  scanpy_inmemory_h5ad:       modules/method/scanpy_inmemory_h5ad/profile
+  scanpy_inmemory_h5seurat:   modules/method/scanpy_inmemory_h5seurat/profile
+  scanpy_backed_h5ad:         modules/method/scanpy_backed_h5ad/profile
