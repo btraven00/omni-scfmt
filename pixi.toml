@@ -4,13 +4,14 @@ channels = ["conda-forge"]
 platforms = ["linux-64"]
 
 [dependencies]
-python = ">=3.12"
+python = ">=3.12,<3.14"
 pip = "*"
 git = "*"
 
 [pypi-dependencies]
-omnibenchmark = { git = "https://github.com/omnibenchmark/omnibenchmark.git", branch = "poc/podman-backend" }
+omnibenchmark = { git = "https://github.com/omnibenchmark/omnibenchmark.git", branch = "feat/podman-backend-2" }
 
 [tasks]
-install-omnibenchmark = "pip install --force-reinstall --no-deps git+https://github.com/omnibenchmark/omnibenchmark.git@poc/podman-backend"
+install-omnibenchmark = "pip install --force-reinstall --no-deps git+https://github.com/omnibenchmark/omnibenchmark.git@feat/podman-backend-2"
 benchmark = "ob run benchmark.yaml --dirty --unpinned"
+scalability = "ob run scalability.yaml --dirty --unpinned --cores 3"

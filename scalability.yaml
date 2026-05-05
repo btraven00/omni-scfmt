@@ -1,0 +1,86 @@
+id: scfmt_scalability
+description: >
+  Scanpy scalability under concurrent h5ad reads. Data is fetched once via
+  omni-data, materialized to a cached h5ad, then N replicate scanpy jobs run
+  in parallel — each one loads / computes / writes under obkit.logger and is
+  profiled by an in-process denet (no podman). Concurrency is bounded by
+  --cores; bump replicate count to push it.
+
+# YAML anchor for the replicate sweep. Edit this list to change concurrency
+# level, then rerun `obrun --cores N --dirty --unpinned`. Stash each `out/`
+# aside (e.g. `out_N4`) and pass them all to `analysis/scalability.R` to
+# compare. Top-level keys starting with `_` are ignored by ob's parser.
+_replicates: &replicates
+  - replicate: 1
+  - replicate: 2
+  - replicate: 3
+  # - replicate: 4
+  # - replicate: 5
+  # - replicate: 6
+  # - replicate: 7
+  # - replicate: 8
+
+version: "0.1.0"
+benchmarker: "omni-scfmt"
+api_version: "0.5.0"
+software_backend: conda
+
+software_environments:
+  omni_data:
+    description: "hapiq-backed downloader for omni-data"
+    conda: /home/b/phd/omni-data/envs/omni-data.yml
+  scanpy:
+    description: "scanpy + obkit + denet"
+    conda: envs/scanpy.yml
+
+stages:
+  # 1. fetch: omni-data downloads pbmc3k 10x bundle as a single tarball.
+  - id: fetch
+    modules:
+      - id: pbmc3k
+        name: "PBMC 3k (10x filtered matrix bundle)"
+        software_environment: omni_data
+        resources: {cores: 1, mem_mb: 4000}
+        repository:
+          url: https://github.com/btraven00/omni-data
+          commit: main
+        parameters:
+          - uri: "https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz"
+    outputs:
+      - id: tarball
+        path: "{dataset}.tar.gz"
+
+  # 2. prep: one-time conversion of the 10x bundle into a cached h5ad. All
+  # downstream scale replicates share this single artifact.
+  - id: prep
+    modules:
+      - id: pbmc3k_h5ad
+        name: "PBMC 3k → h5ad cache"
+        software_environment: scanpy
+        resources: {cores: 1, mem_mb: 8000}
+        repository: {url: ., commit: main, entrypoint: prep_pbmc3k}
+    inputs:
+      - tarball
+    parameters: []
+    outputs:
+      - id: h5ad
+        path: "{dataset}.h5ad"
+
+  # 3. scale: N replicates of the same scanpy load/compute/writing chain,
+  # all reading the same h5ad concurrently. Snakemake schedules them in
+  # parallel up to --cores.
+  - id: scale
+    modules:
+      - id: scanpy_scale
+        name: "scanpy load/compute/writing replicate"
+        software_environment: scanpy
+        resources: {cores: 1, mem_mb: 8000}
+        repository: {url: ., commit: main, entrypoint: scanpy_scale_prof}
+        parameters: *replicates
+    inputs:
+      - h5ad
+    outputs:
+      - id: out_h5ad
+        # ob auto-disambiguates per-parameter output dirs, so a stable
+        # basename is fine — each replicate writes into its own dir.
+        path: "{dataset}.h5ad"
