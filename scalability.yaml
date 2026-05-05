@@ -34,15 +34,15 @@ _uri_pbmc68k: &uri_pbmc68k "https://cf.10xgenomics.com/samples/cell-exp/1.1.0/fr
 version: "0.1.0"
 benchmarker: "omni-scfmt"
 api_version: "0.5.0"
-software_backend: conda
+software_backend: podman
 
 software_environments:
   omni_data:
     description: "hapiq-backed downloader for omni-data"
-    conda: envs/omni-data.yml
+    docker: "docker://ghcr.io/btraven00/omni-data:latest"
   scanpy:
     description: "scanpy + obkit + denet"
-    conda: envs/scanpy.yml
+    docker: "docker://ghcr.io/btraven00/scfmt-scanpy:latest"
 
 stages:
   # 1. fetch: omni-data downloads the 10x bundle as a single tarball.

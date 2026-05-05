@@ -1,0 +1,8 @@
+[workspace]
+name = "omni-data"
+channels = ["https://prefix.dev/almost-conductor", "conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+hapiq = "*"
+bash = "*"
