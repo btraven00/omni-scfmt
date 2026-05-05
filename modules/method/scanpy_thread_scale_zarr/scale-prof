@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+out_dir="."
+threads="1"
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+    case "${args[i]}" in
+        --output_dir) out_dir="${args[i + 1]}" ;;
+        --threads)      threads="${args[i + 1]}" ;;
+    esac
+done
+mkdir -p "$out_dir"
+denet_out="${out_dir}/scanpy_thread_scale_zarr.threads${threads}.denet.jsonl"
+
+exec denet --json --quiet --out "$denet_out" run -- "$HERE/scale" "$@"
