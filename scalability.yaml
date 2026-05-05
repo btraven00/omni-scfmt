@@ -14,13 +14,6 @@ description: >
 # which rewrites this block per-N automatically.
 _replicates: &replicates
   - replicate: 1
-  - replicate: 2
-  - replicate: 3
-  # - replicate: 4
-  # - replicate: 5
-  # - replicate: 6
-  # - replicate: 7
-  # - replicate: 8
 
 # Dataset library. Each pair (id/name + uri) is an anchor; the active
 # dataset is selected in the fetch stage below by referencing one of these
