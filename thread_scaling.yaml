@@ -1,0 +1,79 @@
+id: scfmt_thread_scaling
+description: >
+  Scanpy thread-scaling benchmark. A single replicate runs the full
+  load/compute/write pipeline at each core count (1 2 4 8 16). BLAS and
+  sklearn thread pools are set to match --cores so we measure application-level
+  speedup. Run with --cores 1 so each variant executes alone on the machine.
+
+version: "0.1.0"
+benchmarker: "omni-scfmt"
+api_version: "0.5.0"
+software_backend: podman
+
+software_environments:
+  omni_data:
+    description: "hapiq-backed downloader for omni-data"
+    docker: "docker://ghcr.io/btraven00/omni-data:latest"
+  scanpy:
+    description: "scanpy + obkit + denet"
+    docker: "docker://ghcr.io/btraven00/scfmt-scanpy:latest"
+
+# Thread counts to sweep. Edit to taste; no point going past physical cores.
+_thread_counts: &thread_counts
+  - threads: 1
+  - threads: 2
+  - threads: 4
+  - threads: 8
+  - threads: 16
+
+# Dataset anchors (shared with scalability.yaml)
+_pbmc68k: &pbmc68k
+  id: pbmc68k
+  name: "PBMC 68k donor A (10x filtered matrix bundle)"
+_uri_pbmc68k: &uri_pbmc68k "https://cf.10xgenomics.com/samples/cell-exp/1.1.0/fresh_68k_pbmc_donor_a/fresh_68k_pbmc_donor_a_filtered_gene_bc_matrices.tar.gz"
+
+# ---------------------------------------------------------------------------
+
+stages:
+  - id: fetch
+    modules:
+      - <<: *pbmc68k
+        software_environment: omni_data
+        resources: {cores: 1, mem_mb: 8000}
+        repository:
+          url: https://github.com/btraven00/omni-data
+          commit: main
+        parameters:
+          - uri: *uri_pbmc68k
+    outputs:
+      - id: tarball
+        path: "{dataset}.tar.gz"
+
+  - id: prep
+    modules:
+      - id: h5ad_cache
+        name: "10x bundle → h5ad cache"
+        software_environment: scanpy
+        resources: {cores: 1, mem_mb: 8000}
+        repository: {url: ., commit: main, entrypoint: prep_pbmc3k}
+    inputs:
+      - tarball
+    parameters: []
+    outputs:
+      - id: h5ad
+        path: "{dataset}.h5ad"
+
+  - id: scale
+    modules:
+      - id: scanpy_thread_scale
+        name: "scanpy thread-scaling benchmark"
+        software_environment: scanpy
+        # Always allocate max cores so the container is never the bottleneck.
+        resources: {cores: 16, mem_mb: 16000}
+        repository: {url: ., commit: main, entrypoint: scanpy_thread_scale_prof}
+        parameters: *thread_counts
+    inputs:
+      - h5ad
+    outputs:
+      - id: out_h5ad
+        path: "{dataset}.h5ad"
