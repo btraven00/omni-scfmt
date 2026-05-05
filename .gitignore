@@ -1,5 +1,6 @@
 .obflow/
 out/
+runs/
 omnibench.logger/
 env/
 scratch/

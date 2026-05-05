@@ -6,10 +6,12 @@ description: >
   profiled by an in-process denet (no podman). Concurrency is bounded by
   --cores; bump replicate count to push it.
 
-# YAML anchor for the replicate sweep. Edit this list to change concurrency
-# level, then rerun `obrun --cores N --dirty --unpinned`. Stash each `out/`
-# aside (e.g. `out_N4`) and pass them all to `analysis/scalability.R` to
-# compare. Top-level keys starting with `_` are ignored by ob's parser.
+# ---------------------------------------------------------------------------
+# Knobs (top-level `_*` keys are ignored by ob's parser, just YAML anchors)
+# ---------------------------------------------------------------------------
+
+# Replicate sweep. Edit, then rerun. Or use `pixi run scalability-sweep`
+# which rewrites this block per-N automatically.
 _replicates: &replicates
   - replicate: 1
   - replicate: 2
@@ -19,6 +21,22 @@ _replicates: &replicates
   # - replicate: 6
   # - replicate: 7
   # - replicate: 8
+
+# Dataset library. Each pair (id/name + uri) is an anchor; the active
+# dataset is selected in the fetch stage below by referencing one of these
+# anchors with `<<: *pbmc3k` and `uri: *uri_pbmc3k`. To switch, edit those
+# two lines in the fetch module.
+_pbmc3k: &pbmc3k
+  id: pbmc3k
+  name: "PBMC 3k (10x filtered matrix bundle)"
+_pbmc68k: &pbmc68k
+  id: pbmc68k
+  name: "PBMC 68k donor A (10x filtered matrix bundle)"
+
+_uri_pbmc3k:  &uri_pbmc3k  "https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz"
+_uri_pbmc68k: &uri_pbmc68k "https://cf.10xgenomics.com/samples/cell-exp/1.1.0/fresh_68k_pbmc_donor_a/fresh_68k_pbmc_donor_a_filtered_gene_bc_matrices.tar.gz"
+
+# ---------------------------------------------------------------------------
 
 version: "0.1.0"
 benchmarker: "omni-scfmt"
@@ -34,30 +52,32 @@ software_environments:
     conda: envs/scanpy.yml
 
 stages:
-  # 1. fetch: omni-data downloads pbmc3k 10x bundle as a single tarball.
+  # 1. fetch: omni-data downloads the 10x bundle as a single tarball.
   - id: fetch
     modules:
-      - id: pbmc3k
-        name: "PBMC 3k (10x filtered matrix bundle)"
+      # Active dataset: edit these two anchor refs to switch.
+      - <<: *pbmc68k
         software_environment: omni_data
-        resources: {cores: 1, mem_mb: 4000}
+        resources: {cores: 1, mem_mb: 8000}
         repository:
           url: https://github.com/btraven00/omni-data
           commit: main
         parameters:
-          - uri: "https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz"
+          - uri: *uri_pbmc68k
     outputs:
       - id: tarball
         path: "{dataset}.tar.gz"
 
   # 2. prep: one-time conversion of the 10x bundle into a cached h5ad. All
-  # downstream scale replicates share this single artifact.
+  # downstream scale replicates share this single artifact. The prep module
+  # is named *_pbmc3k for historical reasons but works for any 10x bundle
+  # (it rglob's matrix.mtx).
   - id: prep
     modules:
-      - id: pbmc3k_h5ad
-        name: "PBMC 3k → h5ad cache"
+      - id: h5ad_cache
+        name: "10x bundle → h5ad cache"
         software_environment: scanpy
-        resources: {cores: 1, mem_mb: 8000}
+        resources: {cores: 1, mem_mb: 32000}
         repository: {url: ., commit: main, entrypoint: prep_pbmc3k}
     inputs:
       - tarball
@@ -74,7 +94,7 @@ stages:
       - id: scanpy_scale
         name: "scanpy load/compute/writing replicate"
         software_environment: scanpy
-        resources: {cores: 1, mem_mb: 8000}
+        resources: {cores: 1, mem_mb: 24000}
         repository: {url: ., commit: main, entrypoint: scanpy_scale_prof}
         parameters: *replicates
     inputs:

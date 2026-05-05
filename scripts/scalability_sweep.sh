@@ -4,9 +4,14 @@
 # obrun, and stash the output dir as `runs/N<N>/`. Original yaml is
 # restored on exit (or interrupt) via trap.
 #
+# The snakemake worker pool size (`obrun --cores`) is held constant and
+# decoupled from N so we measure read contention at fixed worker
+# availability. Set it via SNAKEMAKE_CORES or the env var, default 64.
+#
 # Usage:
-#   scripts/scalability_sweep.sh                  # default 1 2 3 5 8
-#   scripts/scalability_sweep.sh 1 2 4 8 16       # custom
+#   scripts/scalability_sweep.sh                       # N = 1 2 4 8 16 32 64
+#   scripts/scalability_sweep.sh 1 2 4 8 16 32         # custom Ns
+#   SNAKEMAKE_CORES=16 scripts/scalability_sweep.sh    # smaller pool
 
 set -euo pipefail
 
@@ -16,6 +21,8 @@ ROOT="$(pwd)"
 YAML="$ROOT/scalability.yaml"
 BACKUP="$YAML.sweep.bak"
 RUNS_DIR="$ROOT/runs"
+
+CORES="${SNAKEMAKE_CORES:-64}"
 
 # Restore on any exit (including Ctrl-C). Idempotent: removes BACKUP at end.
 restore() {
@@ -28,18 +35,20 @@ trap restore EXIT INT TERM
 cp "$YAML" "$BACKUP"
 
 NS=("$@")
-[[ ${#NS[@]} -eq 0 ]] && NS=(1 2 3 5 8)
+[[ ${#NS[@]} -eq 0 ]] && NS=(1 2 4 8 16 32 64)
 
 mkdir -p "$RUNS_DIR"
 
+echo "Sweep config: cores=$CORES, Ns=${NS[*]}"
+
 for N in "${NS[@]}"; do
     echo "=========================================="
-    echo "  Concurrency sweep: N=$N"
+    echo "  N=$N readers, --cores $CORES (pool size)"
     echo "=========================================="
 
-    # Build the replicate list as a here-doc, then splice it in by deleting
-    # the existing anchor block (`_replicates: &replicates` through the next
-    # blank line) and inserting the new one in its place.
+    # Build the replicate list, then splice it into the yaml in place of
+    # the existing `_replicates: &replicates` anchor block. The block ends
+    # at the first blank line.
     {
         echo "_replicates: &replicates"
         for i in $(seq 1 "$N"); do
@@ -47,8 +56,6 @@ for N in "${NS[@]}"; do
         done
     } > /tmp/scalability_anchor.$$
 
-    # Replace the anchor block in the yaml. The block ends at the first
-    # blank line after the anchor declaration.
     awk -v anchor_file="/tmp/scalability_anchor.$$" '
         BEGIN { in_block = 0; injected = 0 }
         /^_replicates: &replicates/ {
@@ -67,10 +74,12 @@ for N in "${NS[@]}"; do
 
     rm -f /tmp/scalability_anchor.$$
 
-    # Wipe scale-stage outputs from prior N so snakemake re-runs them.
-    rm -rf "$ROOT/out/fetch/pbmc3k/.e024bea6/prep/pbmc3k_h5ad/.default/scale" || true
+    # Wipe scale-stage outputs so snakemake re-runs them. fetch + prep are
+    # cached across Ns — same dataset, same h5ad.
+    find "$ROOT/out" -type d -name 'scale' 2>/dev/null \
+        | while read -r d; do rm -rf "$d"; done
 
-    obrun --dirty --unpinned --cores "$N"
+    obrun --dirty --unpinned --cores "$CORES"
 
     # Stash this run's outputs.
     DEST="$RUNS_DIR/N$N"
@@ -81,4 +90,6 @@ done
 
 echo
 echo "Sweep complete. Plot with:"
-echo "  Rscript analysis/scalability.R $(printf '%s ' "${NS[@]}" | sed 's@\([0-9]*\) @runs/N\1 @g')"
+RUNDIRS=""
+for N in "${NS[@]}"; do RUNDIRS="$RUNDIRS runs/N$N"; done
+echo "  Rscript analysis/scalability.R$RUNDIRS"

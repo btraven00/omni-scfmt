@@ -1,12 +1,20 @@
 [workspace]
 name = "omni-scfmt"
-channels = ["conda-forge"]
+channels = ["https://prefix.dev/edge", "conda-forge"]
 platforms = ["linux-64"]
 
 [dependencies]
 python = ">=3.12,<3.14"
 pip = "*"
 git = "*"
+# R toolchain for analysis/scalability.R. r-obkit comes from prefix.dev/edge.
+r-base = ">=4.3"
+r-ggplot2 = "*"
+r-dplyr = "*"
+r-tidyr = "*"
+r-jsonlite = "*"
+r-patchwork = "*"
+r-obkit = ">=0.0.3"
 
 [pypi-dependencies]
 omnibenchmark = { git = "https://github.com/omnibenchmark/omnibenchmark.git", branch = "feat/podman-backend-2" }
@@ -15,3 +23,6 @@ omnibenchmark = { git = "https://github.com/omnibenchmark/omnibenchmark.git", br
 install-omnibenchmark = "pip install --force-reinstall --no-deps git+https://github.com/omnibenchmark/omnibenchmark.git@feat/podman-backend-2"
 benchmark = "ob run benchmark.yaml --dirty --unpinned"
 scalability = "ob run scalability.yaml --dirty --unpinned --cores 3"
+scalability-sweep = "scripts/scalability_sweep.sh"
+scalability-plot    = "Rscript analysis/scalability.R"
+scalability-profile = "Rscript analysis/scalability_profiles.R"

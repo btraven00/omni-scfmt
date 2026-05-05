@@ -26,8 +26,14 @@ EVENTS_GLOB <- c("omnibench-events.jsonl", "obkit-events.jsonl")
 
 find_event_files <- function(root) {
   pat <- paste(EVENTS_GLOB, collapse = "|")
-  files <- list.files(root, pattern = pat, recursive = TRUE, full.names = TRUE)
-  files[grepl("/scale/scanpy_scale/", files, fixed = TRUE)]
+  # all.files=TRUE because ob writes outputs into dot-prefixed dirs
+  # (e.g. `.default/`, `.0546af9d/`) which list.files() skips by default.
+  files <- list.files(root, pattern = pat, recursive = TRUE,
+                      full.names = TRUE, all.files = TRUE)
+  files <- files[grepl("/scale/scanpy_scale/", files, fixed = TRUE)]
+  # ob writes both a hash dir (`.0546af9d`) and a human-readable symlink
+  # (`replicate-1`) — same file reachable via multiple paths. Dedupe.
+  unique(normalizePath(files))
 }
 
 load_run <- function(root) {
@@ -47,7 +53,15 @@ load_run <- function(root) {
 }
 
 args <- commandArgs(trailingOnly = TRUE)
-if (!length(args)) args <- "out"
+if (!length(args)) {
+  # Default: every runs/N* directory, sorted numerically.
+  candidates <- list.dirs("runs", full.names = TRUE, recursive = FALSE)
+  candidates <- candidates[grepl("/N[0-9]+$", candidates)]
+  ord <- order(as.integer(sub(".*/N", "", candidates)))
+  args <- candidates[ord]
+  if (!length(args)) stop("No runs/N* directories found; pass paths explicitly.")
+}
+cat("Reading runs:", paste(args, collapse = ", "), "\n")
 
 events <- do.call(rbind, lapply(args, load_run))
 
@@ -76,33 +90,49 @@ summary_tbl <- wide %>%
   )
 print(as.data.frame(summary_tbl))
 
-# Plot: stacked elapsed (load + compute + writing) per replicate, faceted
-# by concurrency. The bar height shows total wall, the read+write segments
-# show the I/O overhead this run is asking us to characterize.
+# Aggregate across replicates within each (run, concurrency, stage):
+# mean elapsed time and sd for the error bars.
 long <- wide %>%
   select(run, concurrency, replicate_dir, load, compute, writing) %>%
   pivot_longer(cols = c(load, compute, writing),
                names_to = "stage", values_to = "elapsed_s") %>%
   mutate(stage = factor(stage, levels = c("load", "compute", "writing")))
 
+agg <- long %>%
+  group_by(concurrency, stage) %>%
+  summarise(
+    mean_s = mean(elapsed_s),
+    sd_s   = sd(elapsed_s),
+    n      = dplyr::n(),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Cap the error bar at zero on the log scale: clip lower bound away
+    # from <=0, otherwise log10 fails.
+    ymin = pmax(mean_s - sd_s, mean_s * 0.5, 1e-4),
+    ymax = mean_s + ifelse(is.na(sd_s), 0, sd_s)
+  )
+
 dir.create("plots", showWarnings = FALSE)
 
-p <- ggplot(long, aes(x = replicate_dir, y = elapsed_s, fill = stage)) +
-  geom_col() +
-  facet_wrap(~ paste0("N=", concurrency, "  (", run, ")"),
-             scales = "free_x") +
-  scale_fill_manual(values = c(load = "#4C72B0",
-                               compute = "#55A868",
-                               writing = "#C44E52")) +
+p <- ggplot(agg, aes(x = concurrency, y = mean_s, color = stage, group = stage)) +
+  geom_line(linewidth = 0.7) +
+  geom_point(size = 2.5) +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.15, linewidth = 0.5) +
+  scale_x_continuous(breaks = sort(unique(agg$concurrency))) +
+  scale_y_log10() +
+  scale_color_manual(values = c(load = "#4C72B0",
+                                compute = "#55A868",
+                                writing = "#C44E52")) +
   labs(
-    title = "scanpy_scale: I/O vs compute under concurrent h5ad reads",
-    x = "replicate (param hash)",
-    y = "elapsed (s)",
-    fill = NULL
+    title = "scanpy_scale: stage time vs concurrency",
+    subtitle = "mean ± sd across replicates within each N",
+    x = "concurrency level (N)",
+    y = "elapsed (s, log scale)",
+    color = NULL
   ) +
-  theme_minimal(base_size = 11) +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme_minimal(base_size = 11)
 
 ggsave("plots/scalability_io_vs_compute.pdf", p,
-       width = 7, height = 4)
+       width = 6, height = 4)
 cat("\nWrote plots/scalability_io_vs_compute.pdf\n")
