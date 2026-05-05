@@ -66,11 +66,16 @@ stages:
   - id: scale
     modules:
       - id: scanpy_thread_scale
-        name: "scanpy thread-scaling benchmark"
+        name: "scanpy thread-scaling — h5ad (HDF5)"
         software_environment: scanpy
-        # Always allocate max cores so the container is never the bottleneck.
         resources: {cores: 16, mem_mb: 16000}
         repository: {url: ., commit: main, entrypoint: scanpy_thread_scale_prof}
+        parameters: *thread_counts
+      - id: scanpy_thread_scale_zarr
+        name: "scanpy thread-scaling — zarr (blosc parallel)"
+        software_environment: scanpy
+        resources: {cores: 16, mem_mb: 16000}
+        repository: {url: ., commit: main, entrypoint: scanpy_thread_scale_zarr_prof}
         parameters: *thread_counts
     inputs:
       - h5ad
