@@ -75,7 +75,8 @@ if (is.null(all_events) || !nrow(all_events)) stop("No events found under ", roo
 # One row per (backend, threads, stage)
 wide <- all_events %>%
   select(backend, threads, event, elapsed_s) %>%
-  pivot_wider(names_from = event, values_from = elapsed_s) %>%
+  pivot_wider(names_from = event, values_from = elapsed_s,
+              values_fn = mean) %>%
   arrange(backend, threads)
 
 cat("\nRaw timings (s):\n")
