@@ -57,13 +57,15 @@ def main() -> None:
         sc.pp.highly_variable_genes(adata, n_top_genes=args.n_hvg)
         adata = adata[:, adata.var.highly_variable].copy()
         sc.pp.scale(adata, max_value=10)
-        # PCA is deterministic given input, but neighbors + UMAP take a
+        # PCA is deterministic given input, but neighbors takes a
         # random_state — seed per replicate so we get genuine across-rep
-        # variance independent of contention noise. neighbors is the heavy
-        # step here (kNN graph build dominates wall time on 68k+).
+        # variance independent of contention noise.
         sc.tl.pca(adata, n_comps=args.n_comp, random_state=rep * 1000)
         sc.pp.neighbors(adata, n_neighbors=15, random_state=rep * 1000)
-        sc.tl.umap(adata, random_state=rep * 1000)
+        # UMAP commented out: it dominates compute wall and obscures the
+        # read-contention signal we're after. Re-enable for step 2 (worker
+        # scaling) when compute-time variance is the metric of interest.
+        # sc.tl.umap(adata, random_state=rep * 1000)
 
     out_h5ad = out / f"{dataset}.h5ad"
     with stage("writing", rep):

@@ -46,7 +46,7 @@ software_backend: conda
 software_environments:
   omni_data:
     description: "hapiq-backed downloader for omni-data"
-    conda: /home/b/phd/omni-data/envs/omni-data.yml
+    conda: envs/omni-data.yml
   scanpy:
     description: "scanpy + obkit + denet"
     conda: envs/scanpy.yml
@@ -77,7 +77,7 @@ stages:
       - id: h5ad_cache
         name: "10x bundle → h5ad cache"
         software_environment: scanpy
-        resources: {cores: 1, mem_mb: 32000}
+        resources: {cores: 1, mem_mb: 8000}
         repository: {url: ., commit: main, entrypoint: prep_pbmc3k}
     inputs:
       - tarball
@@ -94,7 +94,7 @@ stages:
       - id: scanpy_scale
         name: "scanpy load/compute/writing replicate"
         software_environment: scanpy
-        resources: {cores: 1, mem_mb: 24000}
+        resources: {cores: 1, mem_mb: 8000}
         repository: {url: ., commit: main, entrypoint: scanpy_scale_prof}
         parameters: *replicates
     inputs:
