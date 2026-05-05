@@ -58,7 +58,7 @@ def main() -> None:
         adata = adata[:, adata.var.highly_variable].copy()
         sc.pp.scale(adata, max_value=10)
         sc.tl.pca(adata, n_comps=args.n_comp)
-        sc.pp.neighbors(adata, n_neighbors=15, n_jobs=n)
+        sc.pp.neighbors(adata, n_neighbors=15)
 
     out_h5ad = out / f"{dataset}.h5ad"
     with stage("writing", n):
