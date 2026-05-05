@@ -6,12 +6,13 @@
 #
 # The snakemake worker pool size (`obrun --cores`) is held constant and
 # decoupled from N so we measure read contention at fixed worker
-# availability. Set it via SNAKEMAKE_CORES or the env var, default 64.
+# availability. Set it with -c, or fall back to SNAKEMAKE_CORES env var,
+# default 64.
 #
 # Usage:
-#   scripts/scalability_sweep.sh                       # N = 1 2 4 8 16 32 64
-#   scripts/scalability_sweep.sh 1 2 4 8 16 32         # custom Ns
-#   SNAKEMAKE_CORES=16 scripts/scalability_sweep.sh    # smaller pool
+#   scripts/scalability_sweep.sh                          # N=1..64, cores=64
+#   scripts/scalability_sweep.sh -c 16 1 2 4 8            # cores=16, custom Ns
+#   SNAKEMAKE_CORES=16 scripts/scalability_sweep.sh       # via env var
 
 set -euo pipefail
 
@@ -23,6 +24,15 @@ BACKUP="$YAML.sweep.bak"
 RUNS_DIR="$ROOT/runs"
 
 CORES="${SNAKEMAKE_CORES:-64}"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -c|--cores) CORES="$2"; shift 2 ;;
+        --) shift; break ;;
+        -*) echo "unknown flag: $1" >&2; exit 2 ;;
+        *) break ;;
+    esac
+done
 
 # Restore on any exit (including Ctrl-C). Idempotent: removes BACKUP at end.
 restore() {

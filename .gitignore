@@ -6,3 +6,4 @@ env/
 scratch/
 *.swp
 /.snakemake
+.claude/
