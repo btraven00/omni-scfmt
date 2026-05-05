@@ -81,19 +81,19 @@ wide <- all_events %>%
 cat("\nRaw timings (s):\n")
 print(as.data.frame(wide))
 
-# Speedup relative to threads=1 within each backend
-speedup <- wide %>%
-  group_by(backend) %>%
-  mutate(across(where(is.numeric) & !threads,
-                ~ first(.x[threads == 1]) / .x,
-                .names = "{.col}_speedup")) %>%
-  ungroup()
-
-# Long form for plotting — only stages present in both backends
+# Long form for plotting — only stages present in data
 stage_cols <- intersect(
   c("convert", "load", "compute", "writing"),
   names(wide)
 )
+
+# Speedup relative to threads=1 within each backend
+speedup <- wide %>%
+  group_by(backend) %>%
+  mutate(across(all_of(stage_cols),
+                ~ first(.x[threads == 1]) / .x,
+                .names = "{.col}_speedup")) %>%
+  ungroup()
 
 long_time <- wide %>%
   pivot_longer(all_of(stage_cols), names_to = "stage", values_to = "elapsed_s") %>%
