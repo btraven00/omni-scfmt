@@ -90,10 +90,14 @@ stages:
         resources: {cores: 1, mem_mb: 8000}
         repository: {url: ., commit: main, entrypoint: scanpy_scale_prof}
         parameters: *replicates
+      - id: scanpy_scale_backed
+        name: "scanpy backed (mmap) load/compute/writing replicate"
+        software_environment: scanpy
+        resources: {cores: 1, mem_mb: 8000}
+        repository: {url: ., commit: main, entrypoint: scanpy_scale_backed_prof}
+        parameters: *replicates
     inputs:
       - h5ad
     outputs:
       - id: out_h5ad
-        # ob auto-disambiguates per-parameter output dirs, so a stable
-        # basename is fine — each replicate writes into its own dir.
         path: "{dataset}.h5ad"

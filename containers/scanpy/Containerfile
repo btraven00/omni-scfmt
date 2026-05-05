@@ -4,5 +4,6 @@ COPY pixi.toml .
 RUN pixi install
 
 FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/.pixi/envs/default /opt/env
 ENV PATH=/opt/env/bin:$PATH

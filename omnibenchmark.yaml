@@ -28,3 +28,5 @@ entrypoints:
   prep_pbmc3k:                modules/data/prep_pbmc3k/prep
   scanpy_scale:               modules/method/scanpy_scale/scale
   scanpy_scale_prof:          modules/method/scanpy_scale/scale-prof
+  scanpy_scale_backed:        modules/method/scanpy_scale_backed/scale
+  scanpy_scale_backed_prof:   modules/method/scanpy_scale_backed/scale-prof

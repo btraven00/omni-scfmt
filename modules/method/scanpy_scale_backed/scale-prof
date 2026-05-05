@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# denet-profiled wrapper for the scale entrypoint. Writes
+# {output_dir}/scanpy_scale_backed.rep<N>.denet.jsonl alongside other artifacts.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+out_dir="."
+replicate="0"
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+    case "${args[i]}" in
+        --output_dir) out_dir="${args[i + 1]}" ;;
+        --replicate)  replicate="${args[i + 1]}" ;;
+    esac
+done
+mkdir -p "$out_dir"
+denet_out="${out_dir}/scanpy_scale_backed.rep${replicate}.denet.jsonl"
+
+exec denet --json --quiet --out "$denet_out" run -- "$HERE/scale" "$@"
